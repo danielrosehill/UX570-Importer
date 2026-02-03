@@ -10,7 +10,7 @@ DEFAULT_CONFIG = {
     "username": "",
     "sd_card_name": "DVR_SD",
     "default_output_dir": "~/DVR-Recordings",
-    "default_mode": "copy",
+    "default_mode": "move",
     "gui": {
         "checksum_enabled": True,
         "window_geometry": None,
@@ -81,14 +81,23 @@ def detect_sony_dvr(username: str | None = None) -> dict | None:
 
 def get_config_path() -> Path:
     """Get the path to the config file."""
-    # Check for config in the package directory first
+    # Check user config first (for user customizations)
+    user_config = Path.home() / ".config" / "ux570-importer" / "config.yaml"
+    if user_config.exists():
+        return user_config
+
+    # Check system config
+    system_config = Path("/etc/ux570-importer/config.yaml")
+    if system_config.exists():
+        return system_config
+
+    # Check for config in the package directory (development mode)
     pkg_config = Path(__file__).parent.parent.parent.parent / "config.yaml"
     if pkg_config.exists():
         return pkg_config
 
-    # Fall back to user config directory
-    config_dir = Path.home() / ".config" / "ux570-importer"
-    return config_dir / "config.yaml"
+    # Fall back to user config directory (will be created when saving)
+    return user_config
 
 
 def load_settings(config_path: Path | None = None) -> dict:

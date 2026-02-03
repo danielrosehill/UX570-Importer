@@ -6,4 +6,9 @@ sd_card_name: DVR_SD
 default_output_dir: ~/DVR-Recordings
 
 # Operation mode: "copy" or "move"
-default_mode: copy
+default_mode: move
+
+# GUI settings
+gui:
+  checksum_enabled: true
+  first_run_completed: false

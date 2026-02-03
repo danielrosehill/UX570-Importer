@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME=ux570-importer
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	dh_auto_install
+	# Install CLI script
+	install -D -m 755 dvr-import.py debian/ux570-importer/usr/bin/dvr-import
+	# Install GUI script
+	install -D -m 755 dvr_gui.py debian/ux570-importer/usr/bin/dvr-import-gui
+	# Install default config
+	install -D -m 644 config.yaml debian/ux570-importer/etc/ux570-importer/config.yaml

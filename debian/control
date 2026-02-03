@@ -1,0 +1,22 @@
+Source: ux570-importer
+Section: utils
+Priority: optional
+Maintainer: Daniel Rosehill <daniel@danielrosehill.co.il>
+Build-Depends: debhelper-compat (= 13), dh-python, python3-all, python3-setuptools, python3-yaml, pybuild-plugin-pyproject
+Standards-Version: 4.6.0
+Homepage: https://github.com/danielrosehill/UX570-Importer
+
+Package: ux570-importer
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-yaml
+Recommends: python3-pyqt6
+Description: Import recordings from Sony ICD-UX570 Digital Voice Recorder
+ A utility to import recordings from a Sony ICD-UX570 Digital Voice Recorder,
+ organizing them by month and day automatically. Supports both command-line
+ and graphical user interface modes.
+ .
+ Features:
+  - Automatic date-based organization of recordings
+  - Move or copy modes
+  - SHA256 checksum generation
+  - GUI interface (with PyQt6)

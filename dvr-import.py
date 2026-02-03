@@ -7,31 +7,17 @@ organizing them by month/day.
 """
 
 import argparse
-import os
-import shutil
 import sys
 from pathlib import Path
 
+# Add src to path for development
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
 import yaml
 
+from ux570_importer import core
+
 CONFIG_FILE = Path(__file__).parent / "config.yaml"
-
-MONTHS = {
-    "01": "01-January",
-    "02": "02-February",
-    "03": "03-March",
-    "04": "04-April",
-    "05": "05-May",
-    "06": "06-June",
-    "07": "07-July",
-    "08": "08-August",
-    "09": "09-September",
-    "10": "10-October",
-    "11": "11-November",
-    "12": "12-December",
-}
-
-EXCLUDED_FOLDERS = {"RADIO01"}
 
 
 def load_config() -> dict:
@@ -42,93 +28,6 @@ def load_config() -> dict:
 
     with open(CONFIG_FILE) as f:
         return yaml.safe_load(f)
-
-
-def get_source_path(config: dict) -> Path:
-    """Build the source path from config."""
-    return Path(f"/media/{config['username']}/{config['sd_card_name']}/PRIVATE/SONY/REC_FILE")
-
-
-def parse_filename(filename: str) -> tuple[str, str] | None:
-    """
-    Parse Sony DVR filename format: YYMMDD_HHMM.mp3
-    Returns (month, day) or None if parsing fails.
-    """
-    stem = Path(filename).stem
-    if len(stem) < 6 or "_" not in stem:
-        return None
-
-    try:
-        date_part = stem.split("_")[0]
-        if len(date_part) != 6:
-            return None
-
-        # YYMMDD format
-        month = date_part[2:4]
-        day = date_part[4:6]
-
-        if month not in MONTHS:
-            return None
-        if not (1 <= int(day) <= 31):
-            return None
-
-        return month, day
-    except (ValueError, IndexError):
-        return None
-
-
-def discover_folders(source_path: Path) -> list[Path]:
-    """Find all recording folders, excluding RADIO01."""
-    if not source_path.exists():
-        print(f"Error: Source path not found: {source_path}")
-        print("Is the DVR connected and mounted?")
-        sys.exit(1)
-
-    folders = []
-    for item in sorted(source_path.iterdir()):
-        if item.is_dir() and item.name not in EXCLUDED_FOLDERS:
-            folders.append(item)
-
-    return folders
-
-
-def discover_files(folder: Path) -> list[Path]:
-    """Find all audio files in a folder."""
-    extensions = {".mp3", ".wav", ".m4a", ".wma"}
-    files = []
-    for item in sorted(folder.iterdir()):
-        if item.is_file() and item.suffix.lower() in extensions:
-            files.append(item)
-    return files
-
-
-def import_file(src: Path, dest_base: Path, mode: str) -> bool:
-    """Import a single file to the organized destination."""
-    parsed = parse_filename(src.name)
-    if not parsed:
-        print(f"  Warning: Could not parse date from {src.name}, skipping")
-        return False
-
-    month, day = parsed
-    month_folder = MONTHS[month]
-
-    dest_dir = dest_base / month_folder / day
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    dest_file = dest_dir / src.name
-
-    if dest_file.exists():
-        print(f"  Skipping (exists): {src.name}")
-        return False
-
-    if mode == "move":
-        shutil.move(src, dest_file)
-        print(f"  Moved: {src.name} -> {dest_dir.relative_to(dest_base)}/")
-    else:
-        shutil.copy2(src, dest_file)
-        print(f"  Copied: {src.name} -> {dest_dir.relative_to(dest_base)}/")
-
-    return True
 
 
 def prompt_yes_no(prompt: str, default: bool = True) -> bool:
@@ -150,6 +49,7 @@ Examples:
   dvr-import.py -o ~/recordings     # Specify output directory
   dvr-import.py --move              # Move instead of copy
   dvr-import.py --list              # List available files without importing
+  dvr-import.py --checksum          # Generate SHA256 checksums
         """
     )
     parser.add_argument("-o", "--output", help="Output directory")
@@ -157,17 +57,22 @@ Examples:
     parser.add_argument("--copy", action="store_true", help="Copy files (default)")
     parser.add_argument("--list", action="store_true", help="List files without importing")
     parser.add_argument("--all", action="store_true", help="Import all folders without prompting")
+    parser.add_argument("--checksum", action="store_true", help="Generate SHA256 checksums")
 
     args = parser.parse_args()
 
     config = load_config()
-    source_path = get_source_path(config)
+    source_path = core.get_source_path(config["username"], config["sd_card_name"])
 
     print(f"Source: {source_path}")
 
     # Discover folders
-    folders = discover_folders(source_path)
+    folders = core.discover_folders(source_path)
     if not folders:
+        if not source_path.exists():
+            print(f"Error: Source path not found: {source_path}")
+            print("Is the DVR connected and mounted?")
+            sys.exit(1)
         print("No recording folders found.")
         sys.exit(0)
 
@@ -176,13 +81,13 @@ Examples:
     # List mode
     if args.list:
         for folder in folders:
-            files = discover_files(folder)
+            files = core.discover_files(folder)
             print(f"  {folder.name}/  ({len(files)} files)")
             for f in files:
-                parsed = parse_filename(f.name)
+                parsed = core.parse_filename(f.name)
                 if parsed:
                     month, day = parsed
-                    print(f"    {f.name}  -> {MONTHS[month]}/{day}/")
+                    print(f"    {f.name}  -> {core.MONTHS[month]}/{day}/")
                 else:
                     print(f"    {f.name}  (unparseable)")
         sys.exit(0)
@@ -210,12 +115,15 @@ Examples:
         else:
             mode = "move" if prompt_yes_no("Move files (delete from DVR)?", default=False) else "copy"
 
-    print(f"Mode: {mode}\n")
+    print(f"Mode: {mode}")
+    if args.checksum:
+        print("Checksums: enabled")
+    print()
 
     # Process each folder
     total_imported = 0
     for folder in folders:
-        files = discover_files(folder)
+        files = core.discover_files(folder)
         if not files:
             continue
 
@@ -227,7 +135,9 @@ Examples:
                 continue
 
         for f in files:
-            if import_file(f, output_dir, mode):
+            success, message = core.import_file(f, output_dir, mode, args.checksum)
+            print(f"  {message}")
+            if success:
                 total_imported += 1
         print()
 
