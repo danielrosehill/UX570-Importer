@@ -1,0 +1,9 @@
+# DVR Import Configuration
+username: daniel
+sd_card_name: DVR_SD
+
+# Default output directory (can be overridden at runtime)
+default_output_dir: ~/DVR-Recordings
+
+# Operation mode: "copy" or "move"
+default_mode: copy

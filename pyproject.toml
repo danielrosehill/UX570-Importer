@@ -1,0 +1,11 @@
+[project]
+name = "ux570-importer"
+version = "0.1.0"
+description = "Import recordings from Sony ICD-UX570 Digital Voice Recorder with date-based organization"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+dvr-import = "dvr_import:main"
